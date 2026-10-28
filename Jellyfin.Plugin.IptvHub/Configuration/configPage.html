@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>IPTV Hub</title>
+</head>
+<body>
+<div id="IptvHubConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+    <div data-role="content">
+        <div class="content-primary">
+            <style>
+                #IptvHubConfigPage .ih-tabs { display: flex; flex-wrap: wrap; gap: .4em; margin: 1em 0; }
+                #IptvHubConfigPage .ih-tabs button.ih-active { background: #00a4dc; color: #fff; }
+                #IptvHubConfigPage .ih-panel { display: none; }
+                #IptvHubConfigPage .ih-panel.ih-show { display: block; }
+                #IptvHubConfigPage table.ih-table { width: 100%; border-collapse: collapse; margin: .5em 0 1em; }
+                #IptvHubConfigPage table.ih-table th, #IptvHubConfigPage table.ih-table td { padding: .3em .4em; border-bottom: 1px solid rgba(128,128,128,.25); text-align: left; vertical-align: middle; }
+                #IptvHubConfigPage table.ih-table input[type=text], #IptvHubConfigPage table.ih-table input[type=number], #IptvHubConfigPage table.ih-table select { width: 100%; box-sizing: border-box; padding: .35em; background: rgba(128,128,128,.12); color: inherit; border: 1px solid rgba(128,128,128,.35); border-radius: 3px; }
+                #IptvHubConfigPage .ih-row { display: flex; flex-wrap: wrap; gap: .5em; align-items: center; margin: .5em 0; }
+                #IptvHubConfigPage .ih-row > input[type=text], #IptvHubConfigPage .ih-row > select { padding: .4em; background: rgba(128,128,128,.12); color: inherit; border: 1px solid rgba(128,128,128,.35); border-radius: 3px; }
+                #IptvHubConfigPage .ih-chip { display: inline-block; padding: 0 .5em; margin: 0 .2em .2em 0; border-radius: 1em; background: rgba(0,164,220,.25); font-size: .85em; }
+                #IptvHubConfigPage .ih-muted { opacity: .65; font-size: .9em; }
+                #IptvHubConfigPage .ih-error { color: #e57373; }
+                #IptvHubConfigPage .ih-logo { width: 32px; height: 24px; object-fit: contain; }
+                #IptvHubConfigPage .ih-scroll { max-height: 65vh; overflow: auto; }
+                #IptvHubConfigPage button.ih-small { padding: .25em .7em; margin: 0; }
+            </style>
+
+            <h2 class="sectionTitle">IPTV Hub</h2>
+            <div id="ihStatus" class="ih-muted">Loading…</div>
+
+            <div class="ih-tabs">
+                <button is="emby-button" type="button" class="raised ih-tab ih-active" data-tab="sources">Playlists</button>
+                <button is="emby-button" type="button" class="raised ih-tab" data-tab="guides">Guides (EPG)</button>
+                <button is="emby-button" type="button" class="raised ih-tab" data-tab="categories">Categories</button>
+                <button is="emby-button" type="button" class="raised ih-tab" data-tab="channels">Channels</button>
+                <button is="emby-button" type="button" class="raised ih-tab" data-tab="settings">Settings</button>
+            </div>
+
+            <!-- Playlists -->
+            <div class="ih-panel ih-show" data-panel="sources">
+                <p class="ih-muted">Add an M3U/M3U8 playlist by URL, by a path on the Jellyfin server (e.g. <code>/media/iptv/list.m3u</code> or <code>D:\iptv\list.m3u</code>), or upload a file from this computer.</p>
+                <table class="ih-table">
+                    <thead><tr><th>On</th><th>Name</th><th>Type</th><th>URL or server path</th><th>User-Agent (optional)</th><th></th></tr></thead>
+                    <tbody id="ihPlaylists"></tbody>
+                </table>
+                <div class="ih-row">
+                    <button is="emby-button" type="button" class="raised ih-small" id="ihAddPlaylistUrl">+ URL</button>
+                    <button is="emby-button" type="button" class="raised ih-small" id="ihAddPlaylistFile">+ Server path</button>
+                    <label class="raised emby-button ih-small" style="cursor:pointer">Upload file…<input type="file" id="ihUploadPlaylist" accept=".m3u,.m3u8,.txt,.gz" style="display:none"></label>
+                </div>
+            </div>
+
+            <!-- Guides -->
+            <div class="ih-panel" data-panel="guides">
+                <p class="ih-muted">XMLTV guides (<code>.xml</code> or <code>.xml.gz</code>). Channels are matched by <code>tvg-id</code>, then by name. You can override the match per channel on the Channels tab.</p>
+                <table class="ih-table">
+                    <thead><tr><th>On</th><th>Name</th><th>Type</th><th>URL or server path</th><th></th></tr></thead>
+                    <tbody id="ihGuides"></tbody>
+                </table>
+                <div class="ih-row">
+                    <button is="emby-button" type="button" class="raised ih-small" id="ihAddGuideUrl">+ URL</button>
+                    <button is="emby-button" type="button" class="raised ih-small" id="ihAddGuideFile">+ Server path</button>
+                    <label class="raised emby-button ih-small" style="cursor:pointer">Upload file…<input type="file" id="ihUploadGuide" accept=".xml,.gz,.xmltv" style="display:none"></label>
+                </div>
+                <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="ihUsePlaylistGuides"><span>Also load guide URLs advertised by playlists (<code>x-tvg-url</code>)</span></label>
+            </div>
+
+            <!-- Categories -->
+            <div class="ih-panel" data-panel="categories">
+                <p class="ih-muted">Your own categories. A channel joins a category if you assign it on the Channels tab, or if its name / playlist group matches the optional pattern (a regular expression, case-insensitive). Categories from the playlists' <code>group-title</code> are always available too.</p>
+                <table class="ih-table">
+                    <thead><tr><th style="width:5em">Order</th><th>Name</th><th>Channel name pattern</th><th>Playlist group pattern</th><th>Channels</th><th></th></tr></thead>
+                    <tbody id="ihCategories"></tbody>
+                </table>
+                <div class="ih-row">
+                    <button is="emby-button" type="button" class="raised ih-small" id="ihAddCategory">+ Category</button>
+                    <select id="ihImportGroup"></select>
+                    <button is="emby-button" type="button" class="raised ih-small" id="ihImportGroupBtn">Copy playlist group as category</button>
+                </div>
+                <h3>Playlist categories</h3>
+                <div id="ihPlaylistGroups" class="ih-muted"></div>
+            </div>
+
+            <!-- Channels -->
+            <div class="ih-panel" data-panel="channels">
+                <div class="ih-row">
+                    <input type="text" id="ihFilterText" placeholder="Search name…">
+                    <select id="ihFilterGroup"></select>
+                    <select id="ihFilterCategory"></select>
+                    <select id="ihFilterGuide">
+                        <option value="">Any guide</option>
+                        <option value="yes">Has guide</option>
+                        <option value="no">No guide</option>
+                    </select>
+                </div>
+                <div class="ih-row">
+                    <span id="ihSelCount" class="ih-muted">0 selected</span>
+                    <select id="ihBulkCategory"></select>
+                    <button is="emby-button" type="button" class="raised ih-small" id="ihBulkAdd">Add to category</button>
+                    <button is="emby-button" type="button" class="raised ih-small" id="ihBulkRemove">Remove from category</button>
+                    <button is="emby-button" type="button" class="raised ih-small" id="ihBulkHide">Hide</button>
+                    <button is="emby-button" type="button" class="raised ih-small" id="ihBulkShow">Show</button>
+                </div>
+                <div class="ih-scroll">
+                    <table class="ih-table">
+                        <thead><tr>
+                            <th><input type="checkbox" id="ihSelAll"></th><th></th><th>Name</th><th style="width:5em">No.</th>
+                            <th>Playlist group</th><th>Categories</th><th>Guide id</th><th>Now</th><th>Hidden</th>
+                        </tr></thead>
+                        <tbody id="ihChannels"></tbody>
+                    </table>
+                </div>
+                <div id="ihChannelsMore" class="ih-muted"></div>
+            </div>
+
+            <!-- Settings -->
+            <div class="ih-panel" data-panel="settings">
+                <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="ihRegisterLiveTv"><span>Add channels and guide to Jellyfin Live TV (creates an M3U tuner per playlist and an XMLTV guide)</span></label>
+                <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="ihShowGroups"><span>Show playlist categories in the IPTV Hub channel</span></label>
+                <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="ihShowAll"><span>Show an "All Channels" folder</span></label>
+                <div class="inputContainer"><input is="emby-input" type="number" id="ihGuideDays" min="1" max="14" label="Guide days to keep"></div>
+                <div class="inputContainer"><input is="emby-input" type="number" id="ihRefreshHours" min="1" max="168" label="Download playlists/guides again after (hours)"></div>
+                <p class="ih-muted">External players can use <code id="ihPlaylistUrl"></code> and <code id="ihGuideUrl"></code> (add <code>&amp;api_key=…</code> / <code>?api_key=…</code> with an API key from Dashboard → API Keys).</p>
+            </div>
+
+            <div class="ih-row" style="margin-top:1.5em">
+                <button is="emby-button" type="button" class="raised button-submit" id="ihSave"><span>Save</span></button>
+                <button is="emby-button" type="button" class="raised" id="ihRefresh"><span>Save &amp; re-download now</span></button>
+            </div>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        (function () {
+            var pluginId = '7c1f6a52-3e1b-4c8e-9a0d-5b2f4e8d9c31';
+            var page = document.querySelector('#IptvHubConfigPage');
+            var config = null;
+            var channels = [];
+            var catalog = { Custom: [], Playlist: [] };
+            var selected = {};
+            var MAX_ROWS = 750;
+
+            function $(sel) { return page.querySelector(sel); }
+            function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+            function newId() { var a = new Uint8Array(16); crypto.getRandomValues(a); return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join(''); }
+            function isFile(k) { return k === 1 || k === 'File'; }
+            function api(path, opts) {
+                opts = opts || {};
+                return ApiClient.fetch({ url: ApiClient.getUrl(path), type: opts.type || 'GET', dataType: 'json' });
+            }
+
+            function override(key, create) {
+                var o = config.Overrides.find(function (x) { return x.Key === key; });
+                if (!o && create) { o = { Key: key, Hidden: false, Name: '', Number: '', EpgId: '' }; config.Overrides.push(o); }
+                return o;
+            }
+
+            function pruneOverrides() {
+                config.Overrides = config.Overrides.filter(function (o) { return o.Hidden || o.Name || o.Number || o.EpgId; });
+            }
+
+            // ---------- sources ----------
+            function sourceRow(list, item, withUa) {
+                var tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td><input type="checkbox" class="s-on"' + (item.Enabled ? ' checked' : '') + '></td>' +
+                    '<td><input type="text" class="s-name" value="' + esc(item.Name) + '"></td>' +
+                    '<td><select class="s-kind"><option value="Url">URL</option><option value="File"' + (isFile(item.Kind) ? ' selected' : '') + '>Server file</option></select></td>' +
+                    '<td><input type="text" class="s-loc" value="' + esc(item.Location) + '" placeholder="https://… or /path/on/server"></td>' +
+                    (withUa ? '<td><input type="text" class="s-ua" value="' + esc(item.UserAgent) + '"></td>' : '') +
+                    '<td><button is="emby-button" type="button" class="raised ih-small s-del">Remove</button></td>';
+                tr.querySelector('.s-on').addEventListener('change', function (e) { item.Enabled = e.target.checked; });
+                tr.querySelector('.s-name').addEventListener('input', function (e) { item.Name = e.target.value; });
+                tr.querySelector('.s-kind').addEventListener('change', function (e) { item.Kind = e.target.value; });
+                tr.querySelector('.s-loc').addEventListener('input', function (e) { item.Location = e.target.value.trim(); });
+                if (withUa) { tr.querySelector('.s-ua').addEventListener('input', function (e) { item.UserAgent = e.target.value; }); }
+                tr.querySelector('.s-del').addEventListener('click', function () { list.splice(list.indexOf(item), 1); renderSources(); });
+                return tr;
+            }
+
+            function renderSources() {
+                var pl = $('#ihPlaylists'); pl.innerHTML = '';
+                config.Playlists.forEach(function (p) { pl.appendChild(sourceRow(config.Playlists, p, true)); });
+                if (!config.Playlists.length) { pl.innerHTML = '<tr><td colspan="6" class="ih-muted">No playlists yet.</td></tr>'; }
+                var gl = $('#ihGuides'); gl.innerHTML = '';
+                config.EpgSources.forEach(function (g) { gl.appendChild(sourceRow(config.EpgSources, g, false)); });
+                if (!config.EpgSources.length) { gl.innerHTML = '<tr><td colspan="5" class="ih-muted">No guides yet.</td></tr>'; }
+            }
+
+            function addSource(list, kind, location, name, withUa) {
+                var item = { Id: newId(), Name: name || '', Kind: kind, Location: location || '', Enabled: true };
+                if (withUa) { item.UserAgent = ''; }
+                list.push(item);
+                renderSources();
+            }
+
+            function upload(input, list, withUa) {
+                var file = input.files[0];
+                if (!file) { return; }
+                var form = new FormData();
+                form.append('file', file);
+                Dashboard.showLoadingMsg();
+                fetch(ApiClient.getUrl('IptvHub/Upload'), {
+                    method: 'POST',
+                    headers: { 'Authorization': 'MediaBrowser Token="' + ApiClient.accessToken() + '"' },
+                    body: form
+                }).then(function (r) {
+                    if (!r.ok) { throw new Error('Upload failed (' + r.status + ')'); }
+                    return r.json();
+                }).then(function (res) {
+                    addSource(list, 'File', res.Path || res.path, res.Name || res.name, withUa);
+                    Dashboard.alert('Uploaded. Click Save to load it.');
+                }).catch(function (e) { Dashboard.alert(e.message); })
+                  .finally(function () { Dashboard.hideLoadingMsg(); input.value = ''; });
+            }
+
+            // ---------- categories ----------
+            function countFor(catId) {
+                var v = catalog.Custom.find(function (c) { return c.Id === catId; });
+                return v ? v.ChannelCount : '–';
+            }
+
+            function renderCategories() {
+                var tb = $('#ihCategories'); tb.innerHTML = '';
+                config.Categories.sort(function (a, b) { return (a.SortOrder - b.SortOrder) || a.Name.localeCompare(b.Name); });
+                config.Categories.forEach(function (c) {
+                    var tr = document.createElement('tr');
+                    tr.innerHTML =
+                        '<td><input type="number" class="c-order" value="' + (c.SortOrder || 0) + '"></td>' +
+                        '<td><input type="text" class="c-name" value="' + esc(c.Name) + '"></td>' +
+                        '<td><input type="text" class="c-np" value="' + esc(c.NamePattern) + '" placeholder="e.g. sport|espn"></td>' +
+                        '<td><input type="text" class="c-gp" value="' + esc(c.GroupPattern) + '" placeholder="e.g. ^UK"></td>' +
+                        '<td>' + countFor(c.Id) + ' <span class="ih-muted">(' + c.ChannelKeys.length + ' assigned)</span></td>' +
+                        '<td><button is="emby-button" type="button" class="raised ih-small c-del">Delete</button></td>';
+                    tr.querySelector('.c-order').addEventListener('input', function (e) { c.SortOrder = parseInt(e.target.value, 10) || 0; });
+                    tr.querySelector('.c-name').addEventListener('input', function (e) { c.Name = e.target.value; renderCategorySelects(); });
+                    tr.querySelector('.c-np').addEventListener('input', function (e) { c.NamePattern = e.target.value; });
+                    tr.querySelector('.c-gp').addEventListener('input', function (e) { c.GroupPattern = e.target.value; });
+                    tr.querySelector('.c-del').addEventListener('click', function () {
+                        if (!confirm('Delete category "' + c.Name + '"?')) { return; }
+                        config.Categories.splice(config.Categories.indexOf(c), 1);
+                        renderCategories(); renderCategorySelects(); renderChannels();
+                    });
+                    tb.appendChild(tr);
+                });
+                if (!config.Categories.length) { tb.innerHTML = '<tr><td colspan="6" class="ih-muted">No custom categories yet.</td></tr>'; }
+
+                $('#ihPlaylistGroups').innerHTML = catalog.Playlist.length
+                    ? catalog.Playlist.map(function (g) { return '<span class="ih-chip">' + esc(g.Name) + ' (' + g.ChannelCount + ')</span>'; }).join(' ')
+                    : 'None yet — add a playlist and save.';
+                $('#ihImportGroup').innerHTML = catalog.Playlist.map(function (g) { return '<option value="' + esc(g.Name) + '">' + esc(g.Name) + '</option>'; }).join('');
+            }
+
+            function renderCategorySelects() {
+                var opts = config.Categories.map(function (c) { return '<option value="' + c.Id + '">' + esc(c.Name || '(unnamed)') + '</option>'; }).join('');
+                $('#ihBulkCategory').innerHTML = opts || '<option value="">Create a category first</option>';
+                var cur = $('#ihFilterCategory').value;
+                $('#ihFilterCategory').innerHTML = '<option value="">Any category</option><option value="__none">No custom category</option>' + opts;
+                $('#ihFilterCategory').value = cur;
+                var g = $('#ihFilterGroup').value;
+                $('#ihFilterGroup').innerHTML = '<option value="">Any playlist group</option>' +
+                    catalog.Playlist.map(function (x) { return '<option value="' + esc(x.Name) + '">' + esc(x.Name) + '</option>'; }).join('');
+                $('#ihFilterGroup').value = g;
+            }
+
+            function categoriesOf(ch) {
+                // Server-computed membership (rules + saved assignments), adjusted for unsaved explicit edits.
+                var set = {};
+                (ch.CategoryIds || []).forEach(function (id) { set[id] = true; });
+                config.Categories.forEach(function (c) { if (c.ChannelKeys.indexOf(ch.Key) >= 0) { set[c.Id] = true; } });
+                return config.Categories.filter(function (c) { return set[c.Id]; });
+            }
+
+            // ---------- channels ----------
+            function filtered() {
+                var text = $('#ihFilterText').value.trim().toLowerCase();
+                var group = $('#ihFilterGroup').value;
+                var cat = $('#ihFilterCategory').value;
+                var guide = $('#ihFilterGuide').value;
+                return channels.filter(function (ch) {
+                    if (text && ch.Name.toLowerCase().indexOf(text) < 0 && ch.OriginalName.toLowerCase().indexOf(text) < 0) { return false; }
+                    if (group && ch.Group !== group) { return false; }
+                    if (guide === 'yes' && !ch.EpgId) { return false; }
+                    if (guide === 'no' && ch.EpgId) { return false; }
+                    if (cat) {
+                        var cats = categoriesOf(ch);
+                        if (cat === '__none') { if (cats.length) { return false; } }
+                        else if (!cats.some(function (c) { return c.Id === cat; })) { return false; }
+                    }
+                    return true;
+                });
+            }
+
+            function renderChannels() {
+                var list = filtered();
+                var tb = $('#ihChannels'); tb.innerHTML = '';
+                var frag = document.createDocumentFragment();
+                list.slice(0, MAX_ROWS).forEach(function (ch) {
+                    var o = override(ch.Key, false) || {};
+                    var tr = document.createElement('tr');
+                    tr.innerHTML =
+                        '<td><input type="checkbox" class="ch-sel"' + (selected[ch.Key] ? ' checked' : '') + '></td>' +
+                        '<td>' + (ch.Logo ? '<img class="ih-logo" loading="lazy" src="' + esc(ch.Logo) + '">' : '') + '</td>' +
+                        '<td><input type="text" class="ch-name" value="' + esc(o.Name || '') + '" placeholder="' + esc(ch.OriginalName) + '"><div class="ih-muted">' + esc(ch.SourceName) + '</div></td>' +
+                        '<td><input type="text" class="ch-num" value="' + esc(o.Number || '') + '" placeholder="' + esc(ch.Number) + '"></td>' +
+                        '<td>' + esc(ch.Group) + '</td>' +
+                        '<td>' + categoriesOf(ch).map(function (c) { return '<span class="ih-chip">' + esc(c.Name) + '</span>'; }).join('') + '</td>' +
+                        '<td><input type="text" class="ch-epg" value="' + esc(o.EpgId || '') + '" placeholder="' + esc(ch.EpgId || ch.TvgId || 'no match') + '"></td>' +
+                        '<td class="ih-muted">' + esc(ch.NowPlaying || '') + '</td>' +
+                        '<td><input type="checkbox" class="ch-hide"' + ((o.Key ? o.Hidden : ch.Hidden) ? ' checked' : '') + '></td>';
+                    tr.querySelector('.ch-sel').addEventListener('change', function (e) { if (e.target.checked) { selected[ch.Key] = true; } else { delete selected[ch.Key]; } updateSelCount(); });
+                    tr.querySelector('.ch-name').addEventListener('input', function (e) { override(ch.Key, true).Name = e.target.value.trim(); });
+                    tr.querySelector('.ch-num').addEventListener('input', function (e) { override(ch.Key, true).Number = e.target.value.trim(); });
+                    tr.querySelector('.ch-epg').addEventListener('input', function (e) { override(ch.Key, true).EpgId = e.target.value.trim(); });
+                    tr.querySelector('.ch-hide').addEventListener('change', function (e) { override(ch.Key, true).Hidden = e.target.checked; });
+                    frag.appendChild(tr);
+                });
+                tb.appendChild(frag);
+                if (!channels.length) { tb.innerHTML = '<tr><td colspan="9" class="ih-muted">No channels loaded yet. Add a playlist and click Save.</td></tr>'; }
+                $('#ihChannelsMore').textContent = list.length > MAX_ROWS
+                    ? ('Showing ' + MAX_ROWS + ' of ' + list.length + ' matching channels — narrow the search to see the rest. Bulk actions apply to selected rows only.')
+                    : (list.length + ' channels');
+                updateSelCount();
+            }
+
+            function updateSelCount() { $('#ihSelCount').textContent = Object.keys(selected).length + ' selected'; }
+
+            function bulk(fn) {
+                var keys = Object.keys(selected);
+                if (!keys.length) { Dashboard.alert('Select some channels first.'); return; }
+                keys.forEach(fn);
+                renderChannels(); renderCategories();
+            }
+
+            // ---------- load / save ----------
+            function renderStatus(s) {
+                var html = s.Refreshing ? 'Refreshing… ' : '';
+                html += s.LastRefresh
+                    ? (s.Channels + ' channels (' + s.Hidden + ' hidden), ' + s.WithGuide + ' with guide data, ' + s.Programmes + ' programmes. Last refresh ' + new Date(s.LastRefresh).toLocaleString() + '.')
+                    : 'Not loaded yet.';
+                if (s.Errors && s.Errors.length) {
+                    html += '<div class="ih-error">' + s.Errors.map(esc).join('<br>') + '</div>';
+                }
+                $('#ihStatus').innerHTML = html;
+            }
+
+            function loadServerData() {
+                return Promise.all([api('IptvHub/Status'), api('IptvHub/Channels'), api('IptvHub/Categories')]).then(function (r) {
+                    renderStatus(r[0]);
+                    channels = r[1] || [];
+                    catalog = r[2] || { Custom: [], Playlist: [] };
+                    var known = {}; channels.forEach(function (c) { known[c.Key] = true; });
+                    Object.keys(selected).forEach(function (k) { if (!known[k]) { delete selected[k]; } });
+                    renderCategories(); renderCategorySelects(); renderChannels();
+                    return r[0];
+                });
+            }
+
+            function waitForRefresh(tries) {
+                return new Promise(function (resolve) { setTimeout(resolve, 2500); })
+                    .then(function () { return api('IptvHub/Status'); })
+                    .then(function (s) {
+                        renderStatus(s);
+                        if (s.Refreshing && tries > 0) { return waitForRefresh(tries - 1); }
+                        return loadServerData();
+                    });
+            }
+
+            function load() {
+                Dashboard.showLoadingMsg();
+                ApiClient.getPluginConfiguration(pluginId).then(function (c) {
+                    config = c;
+                    ['Playlists', 'EpgSources', 'Categories', 'Overrides'].forEach(function (k) { config[k] = config[k] || []; });
+                    config.Categories.forEach(function (x) { x.ChannelKeys = x.ChannelKeys || []; });
+                    $('#ihRegisterLiveTv').checked = config.RegisterWithLiveTv;
+                    $('#ihShowGroups').checked = config.ShowPlaylistGroups;
+                    $('#ihShowAll').checked = config.ShowAllChannelsFolder;
+                    $('#ihUsePlaylistGuides').checked = config.UsePlaylistGuideUrls;
+                    $('#ihGuideDays').value = config.GuideDays;
+                    $('#ihRefreshHours').value = config.RefreshIntervalHours;
+                    renderSources();
+                    return loadServerData();
+                }).catch(function (e) { $('#ihStatus').textContent = 'Failed to load: ' + e; })
+                  .finally(function () { Dashboard.hideLoadingMsg(); });
+            }
+
+            function save(forceDownload) {
+                config.RegisterWithLiveTv = $('#ihRegisterLiveTv').checked;
+                config.ShowPlaylistGroups = $('#ihShowGroups').checked;
+                config.ShowAllChannelsFolder = $('#ihShowAll').checked;
+                config.UsePlaylistGuideUrls = $('#ihUsePlaylistGuides').checked;
+                config.GuideDays = parseInt($('#ihGuideDays').value, 10) || 3;
+                config.RefreshIntervalHours = parseInt($('#ihRefreshHours').value, 10) || 12;
+                config.Playlists = config.Playlists.filter(function (p) { return p.Location; });
+                config.EpgSources = config.EpgSources.filter(function (g) { return g.Location; });
+                config.Categories = config.Categories.filter(function (c) { return c.Name.trim(); });
+                pruneOverrides();
+                Dashboard.showLoadingMsg();
+                ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                    Dashboard.processPluginConfigurationUpdateResult(result);
+                    renderSources();
+                    if (forceDownload) {
+                        $('#ihStatus').textContent = 'Downloading…';
+                        return api('IptvHub/Refresh?force=true', { type: 'POST' }).then(loadServerData);
+                    }
+                    // Saving triggers a rebuild on the server; wait for it, then reload the channel list.
+                    return waitForRefresh(120);
+                }).catch(function (e) { Dashboard.alert('Error: ' + e); })
+                  .finally(function () { Dashboard.hideLoadingMsg(); });
+            }
+
+            // ---------- wiring ----------
+            page.querySelectorAll('.ih-tab').forEach(function (b) {
+                b.addEventListener('click', function () {
+                    page.querySelectorAll('.ih-tab').forEach(function (x) { x.classList.toggle('ih-active', x === b); });
+                    page.querySelectorAll('.ih-panel').forEach(function (p) { p.classList.toggle('ih-show', p.getAttribute('data-panel') === b.getAttribute('data-tab')); });
+                });
+            });
+
+            $('#ihAddPlaylistUrl').addEventListener('click', function () { addSource(config.Playlists, 'Url', '', 'Playlist ' + (config.Playlists.length + 1), true); });
+            $('#ihAddPlaylistFile').addEventListener('click', function () { addSource(config.Playlists, 'File', '', 'Playlist ' + (config.Playlists.length + 1), true); });
+            $('#ihUploadPlaylist').addEventListener('change', function (e) { upload(e.target, config.Playlists, true); });
+            $('#ihAddGuideUrl').addEventListener('click', function () { addSource(config.EpgSources, 'Url', '', 'Guide ' + (config.EpgSources.length + 1), false); });
+            $('#ihAddGuideFile').addEventListener('click', function () { addSource(config.EpgSources, 'File', '', 'Guide ' + (config.EpgSources.length + 1), false); });
+            $('#ihUploadGuide').addEventListener('change', function (e) { upload(e.target, config.EpgSources, false); });
+
+            $('#ihAddCategory').addEventListener('click', function () {
+                var name = prompt('Category name');
+                if (!name) { return; }
+                config.Categories.push({ Id: newId(), Name: name.trim(), ChannelKeys: [], NamePattern: '', GroupPattern: '', SortOrder: config.Categories.length });
+                renderCategories(); renderCategorySelects();
+            });
+            $('#ihImportGroupBtn').addEventListener('click', function () {
+                var g = $('#ihImportGroup').value;
+                if (!g) { return; }
+                var rx = '^' + g.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$';
+                config.Categories.push({ Id: newId(), Name: g, ChannelKeys: [], NamePattern: '', GroupPattern: rx, SortOrder: config.Categories.length });
+                renderCategories(); renderCategorySelects();
+            });
+
+            ['#ihFilterText', '#ihFilterGroup', '#ihFilterCategory', '#ihFilterGuide'].forEach(function (s) {
+                $(s).addEventListener(s === '#ihFilterText' ? 'input' : 'change', renderChannels);
+            });
+            $('#ihSelAll').addEventListener('change', function (e) {
+                filtered().slice(0, MAX_ROWS).forEach(function (ch) { if (e.target.checked) { selected[ch.Key] = true; } else { delete selected[ch.Key]; } });
+                renderChannels();
+            });
+            $('#ihBulkAdd').addEventListener('click', function () {
+                var cat = config.Categories.find(function (c) { return c.Id === $('#ihBulkCategory').value; });
+                if (!cat) { Dashboard.alert('Create a category on the Categories tab first.'); return; }
+                bulk(function (k) { if (cat.ChannelKeys.indexOf(k) < 0) { cat.ChannelKeys.push(k); } });
+            });
+            $('#ihBulkRemove').addEventListener('click', function () {
+                var cat = config.Categories.find(function (c) { return c.Id === $('#ihBulkCategory').value; });
+                if (!cat) { return; }
+                bulk(function (k) {
+                    cat.ChannelKeys = cat.ChannelKeys.filter(function (x) { return x !== k; });
+                    var ch = channels.find(function (c) { return c.Key === k; });
+                    if (ch) { ch.CategoryIds = (ch.CategoryIds || []).filter(function (x) { return x !== cat.Id; }); }
+                });
+            });
+            $('#ihBulkHide').addEventListener('click', function () { bulk(function (k) { override(k, true).Hidden = true; }); });
+            $('#ihBulkShow').addEventListener('click', function () { bulk(function (k) { override(k, true).Hidden = false; }); });
+
+            $('#ihSave').addEventListener('click', function () { save(false); });
+            $('#ihRefresh').addEventListener('click', function () { save(true); });
+
+            page.addEventListener('pageshow', function () {
+                var base = ApiClient.serverAddress();
+                $('#ihPlaylistUrl').textContent = base + '/IptvHub/playlist.m3u';
+                $('#ihGuideUrl').textContent = base + '/IptvHub/epg.xml';
+                load();
+            });
+        })();
+    </script>
+</div>
+</body>
+</html>
