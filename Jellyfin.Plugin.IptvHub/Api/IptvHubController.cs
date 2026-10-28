@@ -144,7 +144,7 @@ public class IptvHubController : ControllerBase
             channels = channels.Where(c => c.CategoryIds.Contains(category) || string.Equals(c.Group, category, StringComparison.OrdinalIgnoreCase));
         }
 
-        var names = Plugin.Instance!.Configuration.Categories.ToDictionary(c => c.Id, c => c.Name);
+        var names = IptvManager.VisibleCategoryNames(Plugin.Instance!.Configuration);
         var text = IptvManager.WritePlaylist(null, channels, names, true);
         return File(Encoding.UTF8.GetBytes(text), "audio/x-mpegurl", "iptvhub.m3u");
     }

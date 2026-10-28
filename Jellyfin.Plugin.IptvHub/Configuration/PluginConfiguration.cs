@@ -63,6 +63,15 @@ public class CustomCategory
     /// <summary>Gets or sets the channel keys explicitly assigned to this category.</summary>
     public string[] ChannelKeys { get; set; } = Array.Empty<string>();
 
+    /// <summary>Gets or sets the playlist group-titles whose channels belong to this category.</summary>
+    public string[] Groups { get; set; } = Array.Empty<string>();
+
+    /// <summary>Gets or sets a value indicating whether the category is left out of browsing and Live TV grouping.</summary>
+    public bool Hidden { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether every channel in this category is hidden.</summary>
+    public bool HideChannels { get; set; }
+
     /// <summary>Gets or sets an optional regex; channels whose name matches are included automatically.</summary>
     public string NamePattern { get; set; } = string.Empty;
 
@@ -102,7 +111,13 @@ public class PluginConfiguration : BasePluginConfiguration
 
     public ChannelOverride[] Overrides { get; set; } = Array.Empty<ChannelOverride>();
 
-    /// <summary>Gets or sets a value indicating whether the playlist's own group-title categories are shown.</summary>
+    /// <summary>Gets or sets a value indicating whether each new playlist group-title automatically becomes a category.</summary>
+    public bool AutoCreateGroupCategories { get; set; } = true;
+
+    /// <summary>Gets or sets the playlist groups already turned into categories, so deleted ones are not re-created.</summary>
+    public string[] KnownGroups { get; set; } = Array.Empty<string>();
+
+    /// <summary>Gets or sets a value indicating whether raw playlist groups are shown as folders (only used when automatic categories are off).</summary>
     public bool ShowPlaylistGroups { get; set; } = true;
 
     /// <summary>Gets or sets a value indicating whether an "All Channels" folder is shown.</summary>

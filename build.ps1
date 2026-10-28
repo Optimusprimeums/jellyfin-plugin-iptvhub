@@ -1,10 +1,10 @@
 # Builds the plugin and produces an installable zip in ./dist
-param([string]$Version = "1.0.0.0")
+param([string]$Version = "1.1.0.0", [string]$Changelog = "")
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 $out = Join-Path $root "dist\IptvHub_$Version"
 
-dotnet publish "$root\Jellyfin.Plugin.IptvHub\Jellyfin.Plugin.IptvHub.csproj" -c Release -o "$root\dist\publish" -p:Version=$Version
+dotnet publish "$root\Jellyfin.Plugin.IptvHub\Jellyfin.Plugin.IptvHub.csproj" -c Release -o "$root\dist\publish" -p:Version=$Version -p:AssemblyVersion=$Version -p:FileVersion=$Version
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
 
 Remove-Item $out -Recurse -Force -ErrorAction SilentlyContinue
@@ -13,7 +13,7 @@ Copy-Item "$root\dist\publish\Jellyfin.Plugin.IptvHub.dll" $out
 
 @{
     category    = "Live TV"
-    changelog   = "Initial release."
+    changelog   = $Changelog
     description = "Serve IPTV from M3U playlists (URL, server path or upload) with XMLTV guides, playlist categories and your own custom categories."
     guid        = "7c1f6a52-3e1b-4c8e-9a0d-5b2f4e8d9c31"
     name        = "IPTV Hub"

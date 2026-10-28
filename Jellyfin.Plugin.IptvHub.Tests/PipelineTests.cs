@@ -98,6 +98,12 @@ public class PipelineTests
         Assert.Equal(2, snap.CustomCategories.Single(c => c.Id == sports.Id).ChannelCount);
         Assert.Equal(new[] { "Kids", "News", "Sports", "Uncategorized" }, snap.PlaylistGroups.Select(g => g.Name));
 
+        // Each playlist group became a real category (playlist order, Uncategorized last) with its channels in it.
+        Assert.Equal(new[] { "My Sports", "Favourites", "News", "Sports", "Kids", "Uncategorized" }, cfg.Categories.OrderBy(c => c.SortOrder).Select(c => c.Name));
+        var sportsGroup = cfg.Categories.Single(c => c.Name == "Sports");
+        Assert.Equal(2, snap.CustomCategories.Single(c => c.Id == sportsGroup.Id).ChannelCount);
+        Assert.Contains(sportsGroup.Id, byName["Sport Two"].CategoryIds);
+
         // Explicit assignment and overrides, rebuilt from cache (no forced download).
         favs.ChannelKeys = new[] { byName["Kids TV"].Key, byName["News One HD"].Key };
         cfg.Overrides = new[]
@@ -124,12 +130,20 @@ public class PipelineTests
         // Channel browsing: custom categories, playlist categories, All Channels.
         var channel = new IptvHubChannel(manager);
         var top = await channel.GetChannelItems(new InternalChannelItemQuery(), CancellationToken.None);
-        Assert.Equal(new[] { "My Sports", "Favourites", "Kids", "News", "Sports", "Uncategorized", "All Channels" }, top.Items.Select(i => i.Name));
+        Assert.Equal(new[] { "My Sports", "Favourites", "News", "Sports", "Kids", "Uncategorized", "All Channels" }, top.Items.Select(i => i.Name));
         var favItems = await channel.GetChannelItems(new InternalChannelItemQuery { FolderId = top.Items[1].Id }, CancellationToken.None);
         Assert.Equal(2, favItems.Items.Count);
         Assert.Contains("Now: Bulletin", favItems.Items.Single(i => i.Name.Contains("News", StringComparison.Ordinal)).Overview, StringComparison.Ordinal);
         var media = await channel.GetChannelItemMediaInfo(favItems.Items[0].Id, CancellationToken.None);
         Assert.True(media.Single().IsInfiniteStream);
+
+        // Hiding a category removes its folder; "hide channels" hides everything in it.
+        cfg.Categories.Single(c => c.Name == "Uncategorized").Hidden = true;
+        cfg.Categories.Single(c => c.Name == "Kids").HideChannels = true;
+        snap = await manager.RefreshAsync(false, CancellationToken.None);
+        Assert.True(snap.ByKey[byName["Kids TV"].Key].Hidden);
+        top = await channel.GetChannelItems(new InternalChannelItemQuery(), CancellationToken.None);
+        Assert.Equal(new[] { "My Sports", "Favourites", "News", "Sports", "All Channels" }, top.Items.Select(i => i.Name));
 
         // Turning Live TV registration off removes what the plugin added.
         cfg.RegisterWithLiveTv = false;

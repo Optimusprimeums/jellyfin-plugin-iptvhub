@@ -43,6 +43,33 @@ public class ParserTests
         Assert.Equal("Foo", entries[2].Headers["User-Agent"]);
     }
 
+    [Fact]
+    public void PlaylistGroupsBecomeCategories()
+    {
+        var cfg = new Configuration.PluginConfiguration
+        {
+            Categories = new[] { new Configuration.CustomCategory { Name = "kids", SortOrder = 5 } }
+        };
+
+        Assert.True(Services.IptvManager.SyncGroupCategories(cfg, new[] { "Uncategorized", "News", "Kids", "News", "Sports" }));
+        Assert.Equal(new[] { "kids", "News", "Sports", "Uncategorized" }, cfg.Categories.OrderBy(c => c.SortOrder).Select(c => c.Name));
+        Assert.Equal(new[] { "Kids" }, cfg.Categories.Single(c => c.Name == "kids").Groups);
+        Assert.Equal(new[] { "News" }, cfg.Categories.Single(c => c.Name == "News").Groups);
+
+        // A deleted category is not re-created; nothing new means nothing to save.
+        cfg.Categories = cfg.Categories.Where(c => c.Name != "Sports").ToArray();
+        Assert.False(Services.IptvManager.SyncGroupCategories(cfg, new[] { "News", "Sports" }));
+        Assert.DoesNotContain(cfg.Categories, c => c.Name == "Sports");
+
+        // A brand-new group still shows up later.
+        Assert.True(Services.IptvManager.SyncGroupCategories(cfg, new[] { "Movies" }));
+        Assert.Contains(cfg.Categories, c => c.Name == "Movies");
+
+        // Turned off: nothing happens.
+        cfg.AutoCreateGroupCategories = false;
+        Assert.False(Services.IptvManager.SyncGroupCategories(cfg, new[] { "Docs" }));
+    }
+
     [Theory]
     [InlineData("20240131203000 +0100", "2024-01-31T19:30:00")]
     [InlineData("20240131203000 -05:00", "2024-02-01T01:30:00")]

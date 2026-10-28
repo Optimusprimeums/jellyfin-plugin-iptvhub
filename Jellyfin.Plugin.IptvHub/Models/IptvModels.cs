@@ -114,4 +114,6 @@ public class CategoryView
     public string Kind { get; set; } = string.Empty;
 
     public int ChannelCount { get; set; }
+
+    public bool Hidden { get; set; }
 }

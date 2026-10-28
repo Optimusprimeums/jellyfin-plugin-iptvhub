@@ -80,8 +80,10 @@ public class IptvHubChannel : IChannel, IRequiresMediaInfoCallback, IHasCacheKey
         if (folderId.Length == 0)
         {
             items = new List<ChannelItemInfo>();
-            items.AddRange(snapshot.CustomCategories.Where(c => c.ChannelCount > 0).Select(c => Folder(CustomPrefix + c.Id, c.Name, c.ChannelCount)));
-            if (cfg.ShowPlaylistGroups)
+            items.AddRange(snapshot.CustomCategories.Where(c => !c.Hidden && c.ChannelCount > 0).Select(c => Folder(CustomPrefix + c.Id, c.Name, c.ChannelCount)));
+
+            // With automatic categories the playlist groups are already categories; don't list them twice.
+            if (cfg.ShowPlaylistGroups && !cfg.AutoCreateGroupCategories)
             {
                 items.AddRange(snapshot.PlaylistGroups.Select(g => Folder(GroupPrefix + g.Id, g.Name, g.ChannelCount)));
             }

@@ -220,6 +220,12 @@ public sealed partial class IptvManager : IDisposable
             }
         }
 
+        // 1b. Every new playlist group becomes a category the user can rename, merge, reorder or hide.
+        if (SyncGroupCategories(cfg, channels.Select(c => c.Group)))
+        {
+            Plugin.Instance!.SaveConfiguration();
+        }
+
         // 2. Guide sources: configured ones plus any advertised by the playlists.
         var guideSources = cfg.EpgSources.Where(s => s.Enabled).Select(s => (Id: s.Id, s.Name, s.Kind, s.Location)).ToList();
         if (cfg.UsePlaylistGuideUrls)
@@ -369,30 +375,38 @@ public sealed partial class IptvManager : IDisposable
             list.Sort((a, b) => a.StartUtc.CompareTo(b.StartUtc));
         }
 
-        // 5. Categories: custom (explicit + rules) and the playlists' own group-titles.
-        var customViews = new List<CategoryView>();
-        foreach (var cat in cfg.Categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase))
+        // 5. Categories: custom (groups + explicit + rules) and the playlists' own group-titles.
+        var orderedCategories = cfg.Categories.OrderBy(c => c.SortOrder).ThenBy(c => c.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        foreach (var cat in orderedCategories)
         {
             var explicitKeys = new HashSet<string>(cat.ChannelKeys, StringComparer.Ordinal);
+            var groups = new HashSet<string>(cat.Groups, StringComparer.OrdinalIgnoreCase);
             var nameRx = TryRegex(cat.NamePattern, cat.Name, errors);
             var groupRx = TryRegex(cat.GroupPattern, cat.Name, errors);
-            var count = 0;
             foreach (var c in channels)
             {
-                if (explicitKeys.Contains(c.Key)
+                if (groups.Contains(c.Group)
+                    || explicitKeys.Contains(c.Key)
                     || (nameRx is not null && nameRx.IsMatch(c.Name))
                     || (groupRx is not null && groupRx.IsMatch(c.Group)))
                 {
                     c.CategoryIds.Add(cat.Id);
-                    if (!c.Hidden)
+                    if (cat.HideChannels)
                     {
-                        count++;
+                        c.Hidden = true;
                     }
                 }
             }
-
-            customViews.Add(new CategoryView { Id = cat.Id, Name = cat.Name, Kind = "custom", ChannelCount = count });
         }
+
+        var customViews = orderedCategories.Select(cat => new CategoryView
+        {
+            Id = cat.Id,
+            Name = cat.Name,
+            Kind = "custom",
+            Hidden = cat.Hidden,
+            ChannelCount = channels.Count(c => !c.Hidden && c.CategoryIds.Contains(cat.Id))
+        }).ToList();
 
         var groupViews = channels.Where(c => !c.Hidden)
             .GroupBy(c => c.Group, StringComparer.CurrentCultureIgnoreCase)
@@ -402,7 +416,7 @@ public sealed partial class IptvManager : IDisposable
             .ToList();
 
         // 6. Per-source playlists for Jellyfin's Live TV tuner.
-        var categoryNames = cfg.Categories.ToDictionary(c => c.Id, c => c.Name, StringComparer.Ordinal);
+        var categoryNames = VisibleCategoryNames(cfg);
         foreach (var source in loadedSources)
         {
             WritePlaylist(PlaylistPath(source.Id), channels.Where(c => c.SourceId == source.Id && !c.Hidden), categoryNames, false);
@@ -483,6 +497,60 @@ public sealed partial class IptvManager : IDisposable
 
         return text;
     }
+
+    /// <summary>
+    /// Creates a category for each playlist group not seen before. A group whose name matches an existing
+    /// category (case-insensitive) is added to that category instead. Groups the user deleted stay deleted.
+    /// </summary>
+    /// <param name="cfg">Configuration to update.</param>
+    /// <param name="groupsInPlaylistOrder">Group of every channel, in playlist order.</param>
+    /// <returns>Whether the configuration changed and needs saving.</returns>
+    public static bool SyncGroupCategories(PluginConfiguration cfg, IEnumerable<string> groupsInPlaylistOrder)
+    {
+        if (!cfg.AutoCreateGroupCategories)
+        {
+            return false;
+        }
+
+        var known = new HashSet<string>(cfg.KnownGroups, StringComparer.OrdinalIgnoreCase);
+        var newGroups = groupsInPlaylistOrder.Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(g => !known.Contains(g))
+            .OrderBy(g => string.Equals(g, UngroupedName, StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+            .ToList();
+        if (newGroups.Count == 0)
+        {
+            return false;
+        }
+
+        var categories = cfg.Categories.ToList();
+        var nextOrder = categories.Count == 0 ? 0 : categories.Max(c => c.SortOrder) + 1;
+        foreach (var group in newGroups)
+        {
+            var existing = categories.FirstOrDefault(c =>
+                string.Equals(c.Name.Trim(), group, StringComparison.OrdinalIgnoreCase)
+                || c.Groups.Contains(group, StringComparer.OrdinalIgnoreCase));
+            if (existing is null)
+            {
+                categories.Add(new CustomCategory { Name = group, Groups = new[] { group }, SortOrder = nextOrder++ });
+            }
+            else if (!existing.Groups.Contains(group, StringComparer.OrdinalIgnoreCase))
+            {
+                existing.Groups = existing.Groups.Append(group).ToArray();
+            }
+
+            known.Add(group);
+        }
+
+        cfg.Categories = categories.ToArray();
+        cfg.KnownGroups = known.ToArray();
+        return true;
+    }
+
+    /// <summary>Visible custom categories by id, for group-title output.</summary>
+    /// <param name="cfg">Configuration.</param>
+    /// <returns>Id to name.</returns>
+    public static Dictionary<string, string> VisibleCategoryNames(PluginConfiguration cfg)
+        => cfg.Categories.Where(c => !c.Hidden).GroupBy(c => c.Id).ToDictionary(g => g.Key, g => g.First().Name, StringComparer.Ordinal);
 
     /// <summary>Stable id for a playlist group-title.</summary>
     /// <param name="group">Group name.</param>

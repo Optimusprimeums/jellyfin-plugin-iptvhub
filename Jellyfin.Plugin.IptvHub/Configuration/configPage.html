@@ -68,17 +68,18 @@
 
             <!-- Categories -->
             <div class="ih-panel" data-panel="categories">
-                <p class="ih-muted">Your own categories. A channel joins a category if you assign it on the Channels tab, or if its name / playlist group matches the optional pattern (a regular expression, case-insensitive). Categories from the playlists' <code>group-title</code> are always available too.</p>
+                <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="ihAutoGroups"><span>Automatically make each playlist group (<code>group-title</code>) a category, with its channels already in it</span></label>
+                <p class="ih-muted">A channel is in a category if its playlist group is listed on the category, if you added it on the Channels tab, or if its name matches the optional pattern (a case-insensitive regular expression). To combine groups, use <b>Merge into</b>. <b>Show</b> controls whether the category appears; <b>Hide channels</b> hides every channel in it. A deleted auto-created category does not come back.</p>
+                <div class="ih-scroll">
                 <table class="ih-table">
-                    <thead><tr><th style="width:5em">Order</th><th>Name</th><th>Channel name pattern</th><th>Playlist group pattern</th><th>Channels</th><th></th></tr></thead>
+                    <thead><tr><th style="width:4.5em">Order</th><th>Name</th><th>Playlist groups</th><th>Name pattern</th><th>Channels</th><th>Show</th><th>Hide channels</th><th></th></tr></thead>
                     <tbody id="ihCategories"></tbody>
                 </table>
+                </div>
                 <div class="ih-row">
                     <button is="emby-button" type="button" class="raised ih-small" id="ihAddCategory">+ Category</button>
-                    <select id="ihImportGroup"></select>
-                    <button is="emby-button" type="button" class="raised ih-small" id="ihImportGroupBtn">Copy playlist group as category</button>
                 </div>
-                <h3>Playlist categories</h3>
+                <h3>Playlist groups not in any category</h3>
                 <div id="ihPlaylistGroups" class="ih-muted"></div>
             </div>
 
@@ -117,7 +118,7 @@
             <!-- Settings -->
             <div class="ih-panel" data-panel="settings">
                 <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="ihRegisterLiveTv"><span>Add channels and guide to Jellyfin Live TV (creates an M3U tuner per playlist and an XMLTV guide)</span></label>
-                <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="ihShowGroups"><span>Show playlist categories in the IPTV Hub channel</span></label>
+                <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="ihShowGroups"><span>Show raw playlist groups as folders in the IPTV Hub channel (only when automatic categories are off)</span></label>
                 <label class="checkboxContainer"><input is="emby-checkbox" type="checkbox" id="ihShowAll"><span>Show an "All Channels" folder</span></label>
                 <div class="inputContainer"><input is="emby-input" type="number" id="ihGuideDays" min="1" max="14" label="Guide days to keep"></div>
                 <div class="inputContainer"><input is="emby-input" type="number" id="ihRefreshHours" min="1" max="168" label="Download playlists/guides again after (hours)"></div>
@@ -221,35 +222,83 @@
                 return v ? v.ChannelCount : '–';
             }
 
+            function sameText(a, b) { return String(a).toLowerCase() === String(b).toLowerCase(); }
+            function hasGroup(c, g) { return c.Groups.some(function (x) { return sameText(x, g); }); }
+
+            function renumber() { config.Categories.forEach(function (c, i) { c.SortOrder = i; }); }
+
+            function refreshAll() { renderCategories(); renderCategorySelects(); renderChannels(); }
+
             function renderCategories() {
                 var tb = $('#ihCategories'); tb.innerHTML = '';
                 config.Categories.sort(function (a, b) { return (a.SortOrder - b.SortOrder) || a.Name.localeCompare(b.Name); });
-                config.Categories.forEach(function (c) {
+                renumber();
+                var frag = document.createDocumentFragment();
+                config.Categories.forEach(function (c, i) {
+                    var free = catalog.Playlist.filter(function (g) { return !hasGroup(c, g.Name); });
+                    var others = config.Categories.filter(function (x) { return x !== c; });
                     var tr = document.createElement('tr');
                     tr.innerHTML =
-                        '<td><input type="number" class="c-order" value="' + (c.SortOrder || 0) + '"></td>' +
+                        '<td style="white-space:nowrap"><button is="emby-button" type="button" class="raised ih-small c-up"' + (i === 0 ? ' disabled' : '') + '>▲</button>' +
+                        '<button is="emby-button" type="button" class="raised ih-small c-down"' + (i === config.Categories.length - 1 ? ' disabled' : '') + '>▼</button></td>' +
                         '<td><input type="text" class="c-name" value="' + esc(c.Name) + '"></td>' +
+                        '<td>' + c.Groups.map(function (g, gi) { return '<span class="ih-chip">' + esc(g) + ' <a href="#" class="c-ungroup" data-i="' + gi + '" title="Remove group">×</a></span>'; }).join('') +
+                        (free.length ? '<select class="c-addgroup"><option value="">+ group…</option>' + free.map(function (g) { return '<option value="' + esc(g.Name) + '">' + esc(g.Name) + '</option>'; }).join('') + '</select>' : '') + '</td>' +
                         '<td><input type="text" class="c-np" value="' + esc(c.NamePattern) + '" placeholder="e.g. sport|espn"></td>' +
-                        '<td><input type="text" class="c-gp" value="' + esc(c.GroupPattern) + '" placeholder="e.g. ^UK"></td>' +
-                        '<td>' + countFor(c.Id) + ' <span class="ih-muted">(' + c.ChannelKeys.length + ' assigned)</span></td>' +
-                        '<td><button is="emby-button" type="button" class="raised ih-small c-del">Delete</button></td>';
-                    tr.querySelector('.c-order').addEventListener('input', function (e) { c.SortOrder = parseInt(e.target.value, 10) || 0; });
+                        '<td>' + countFor(c.Id) + (c.ChannelKeys.length ? ' <span class="ih-muted">(+' + c.ChannelKeys.length + ' picked)</span>' : '') + '</td>' +
+                        '<td><input type="checkbox" class="c-show"' + (c.Hidden ? '' : ' checked') + '></td>' +
+                        '<td><input type="checkbox" class="c-hidech"' + (c.HideChannels ? ' checked' : '') + '></td>' +
+                        '<td style="white-space:nowrap">' +
+                        (others.length ? '<select class="c-merge"><option value="">Merge into…</option>' + others.map(function (x) { return '<option value="' + x.Id + '">' + esc(x.Name) + '</option>'; }).join('') + '</select> ' : '') +
+                        '<button is="emby-button" type="button" class="raised ih-small c-del">Delete</button></td>';
+
+                    function move(d) {
+                        var j = i + d;
+                        config.Categories[i].SortOrder = j; config.Categories[j].SortOrder = i;
+                        renderCategories(); renderCategorySelects();
+                    }
+                    tr.querySelector('.c-up').addEventListener('click', function () { move(-1); });
+                    tr.querySelector('.c-down').addEventListener('click', function () { move(1); });
                     tr.querySelector('.c-name').addEventListener('input', function (e) { c.Name = e.target.value; renderCategorySelects(); });
                     tr.querySelector('.c-np').addEventListener('input', function (e) { c.NamePattern = e.target.value; });
-                    tr.querySelector('.c-gp').addEventListener('input', function (e) { c.GroupPattern = e.target.value; });
-                    tr.querySelector('.c-del').addEventListener('click', function () {
-                        if (!confirm('Delete category "' + c.Name + '"?')) { return; }
-                        config.Categories.splice(config.Categories.indexOf(c), 1);
-                        renderCategories(); renderCategorySelects(); renderChannels();
+                    tr.querySelector('.c-show').addEventListener('change', function (e) { c.Hidden = !e.target.checked; });
+                    tr.querySelector('.c-hidech').addEventListener('change', function (e) { c.HideChannels = e.target.checked; });
+                    tr.querySelectorAll('.c-ungroup').forEach(function (a) {
+                        a.addEventListener('click', function (e) {
+                            e.preventDefault();
+                            c.Groups.splice(parseInt(a.getAttribute('data-i'), 10), 1);
+                            refreshAll();
+                        });
                     });
-                    tb.appendChild(tr);
+                    var add = tr.querySelector('.c-addgroup');
+                    if (add) { add.addEventListener('change', function (e) { if (e.target.value) { c.Groups.push(e.target.value); refreshAll(); } }); }
+                    var merge = tr.querySelector('.c-merge');
+                    if (merge) {
+                        merge.addEventListener('change', function (e) {
+                            var target = config.Categories.find(function (x) { return x.Id === e.target.value; });
+                            if (!target || !confirm('Merge "' + c.Name + '" into "' + target.Name + '"?')) { e.target.value = ''; return; }
+                            c.Groups.forEach(function (g) { if (!hasGroup(target, g)) { target.Groups.push(g); } });
+                            c.ChannelKeys.forEach(function (k) { if (target.ChannelKeys.indexOf(k) < 0) { target.ChannelKeys.push(k); } });
+                            if (c.NamePattern) { target.NamePattern = target.NamePattern ? '(' + target.NamePattern + ')|(' + c.NamePattern + ')' : c.NamePattern; }
+                            if (c.GroupPattern) { target.GroupPattern = target.GroupPattern ? '(' + target.GroupPattern + ')|(' + c.GroupPattern + ')' : c.GroupPattern; }
+                            config.Categories.splice(config.Categories.indexOf(c), 1);
+                            refreshAll();
+                        });
+                    }
+                    tr.querySelector('.c-del').addEventListener('click', function () {
+                        if (!confirm('Delete category "' + c.Name + '"? Its channels stay in All Channels. (Untick Show to keep it but hide it.)')) { return; }
+                        config.Categories.splice(config.Categories.indexOf(c), 1);
+                        refreshAll();
+                    });
+                    frag.appendChild(tr);
                 });
-                if (!config.Categories.length) { tb.innerHTML = '<tr><td colspan="6" class="ih-muted">No custom categories yet.</td></tr>'; }
+                tb.appendChild(frag);
+                if (!config.Categories.length) { tb.innerHTML = '<tr><td colspan="8" class="ih-muted">No categories yet. Add a playlist and save; its groups become categories automatically.</td></tr>'; }
 
-                $('#ihPlaylistGroups').innerHTML = catalog.Playlist.length
-                    ? catalog.Playlist.map(function (g) { return '<span class="ih-chip">' + esc(g.Name) + ' (' + g.ChannelCount + ')</span>'; }).join(' ')
-                    : 'None yet — add a playlist and save.';
-                $('#ihImportGroup').innerHTML = catalog.Playlist.map(function (g) { return '<option value="' + esc(g.Name) + '">' + esc(g.Name) + '</option>'; }).join('');
+                var loose = catalog.Playlist.filter(function (g) { return !config.Categories.some(function (c) { return hasGroup(c, g.Name); }); });
+                $('#ihPlaylistGroups').innerHTML = loose.length
+                    ? loose.map(function (g) { return '<span class="ih-chip">' + esc(g.Name) + ' (' + g.ChannelCount + ')</span>'; }).join(' ')
+                    : (catalog.Playlist.length ? 'Every playlist group is in a category.' : 'None yet — add a playlist and save.');
             }
 
             function renderCategorySelects() {
@@ -268,7 +317,7 @@
                 // Server-computed membership (rules + saved assignments), adjusted for unsaved explicit edits.
                 var set = {};
                 (ch.CategoryIds || []).forEach(function (id) { set[id] = true; });
-                config.Categories.forEach(function (c) { if (c.ChannelKeys.indexOf(ch.Key) >= 0) { set[c.Id] = true; } });
+                config.Categories.forEach(function (c) { if (c.ChannelKeys.indexOf(ch.Key) >= 0 || hasGroup(c, ch.Group)) { set[c.Id] = true; } });
                 return config.Categories.filter(function (c) { return set[c.Id]; });
             }
 
@@ -363,16 +412,18 @@
                     .then(function (s) {
                         renderStatus(s);
                         if (s.Refreshing && tries > 0) { return waitForRefresh(tries - 1); }
-                        return loadServerData();
+                        // The server may have added categories for new playlist groups; pick them up.
+                        return load();
                     });
             }
 
             function load() {
                 Dashboard.showLoadingMsg();
-                ApiClient.getPluginConfiguration(pluginId).then(function (c) {
+                return ApiClient.getPluginConfiguration(pluginId).then(function (c) {
                     config = c;
                     ['Playlists', 'EpgSources', 'Categories', 'Overrides'].forEach(function (k) { config[k] = config[k] || []; });
-                    config.Categories.forEach(function (x) { x.ChannelKeys = x.ChannelKeys || []; });
+                    config.Categories.forEach(function (x) { x.ChannelKeys = x.ChannelKeys || []; x.Groups = x.Groups || []; });
+                    $('#ihAutoGroups').checked = config.AutoCreateGroupCategories;
                     $('#ihRegisterLiveTv').checked = config.RegisterWithLiveTv;
                     $('#ihShowGroups').checked = config.ShowPlaylistGroups;
                     $('#ihShowAll').checked = config.ShowAllChannelsFolder;
@@ -386,6 +437,7 @@
             }
 
             function save(forceDownload) {
+                config.AutoCreateGroupCategories = $('#ihAutoGroups').checked;
                 config.RegisterWithLiveTv = $('#ihRegisterLiveTv').checked;
                 config.ShowPlaylistGroups = $('#ihShowGroups').checked;
                 config.ShowAllChannelsFolder = $('#ihShowAll').checked;
@@ -402,7 +454,7 @@
                     renderSources();
                     if (forceDownload) {
                         $('#ihStatus').textContent = 'Downloading…';
-                        return api('IptvHub/Refresh?force=true', { type: 'POST' }).then(loadServerData);
+                        return api('IptvHub/Refresh?force=true', { type: 'POST' }).then(load);
                     }
                     // Saving triggers a rebuild on the server; wait for it, then reload the channel list.
                     return waitForRefresh(120);
@@ -428,14 +480,7 @@
             $('#ihAddCategory').addEventListener('click', function () {
                 var name = prompt('Category name');
                 if (!name) { return; }
-                config.Categories.push({ Id: newId(), Name: name.trim(), ChannelKeys: [], NamePattern: '', GroupPattern: '', SortOrder: config.Categories.length });
-                renderCategories(); renderCategorySelects();
-            });
-            $('#ihImportGroupBtn').addEventListener('click', function () {
-                var g = $('#ihImportGroup').value;
-                if (!g) { return; }
-                var rx = '^' + g.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$';
-                config.Categories.push({ Id: newId(), Name: g, ChannelKeys: [], NamePattern: '', GroupPattern: rx, SortOrder: config.Categories.length });
+                config.Categories.push({ Id: newId(), Name: name.trim(), ChannelKeys: [], Groups: [], NamePattern: '', GroupPattern: '', Hidden: false, HideChannels: false, SortOrder: config.Categories.length });
                 renderCategories(); renderCategorySelects();
             });
 

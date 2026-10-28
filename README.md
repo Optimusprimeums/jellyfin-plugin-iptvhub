@@ -17,15 +17,16 @@ Built for **Jellyfin 12.4** (.NET 10).
   - channels are matched by `tvg-id` first, then by name ("BBC One HD" matches "BBC One"); you can override the match per channel
   - big guides are streamed, and only the channels you actually have are kept
 - **Categories**
-  - **Playlist categories**: every `group-title` in your playlists becomes a category
-  - **Custom categories**: create your own and fill them by
-    - picking channels on the Channels tab (multi-select, then "Add to category")
-    - a channel-name regex (e.g. `sport|espn`)
-    - a playlist-group regex (e.g. `^UK`); there is a one-click "copy playlist group as category"
+  - **Automatic**: each playlist `group-title` becomes a category with its channels already in it. Nothing to tick. New groups that appear later are added too.
+  - **Tidy them up** on the Categories tab:
+    - rename, reorder (▲/▼), **merge** several groups into one category, or add more groups to a category
+    - untick **Show** to hide a category, or tick **Hide channels** to hide every channel in it (handy for groups you never watch)
+    - a deleted auto-created category stays deleted
+  - **Extra categories** of your own, filled by playlist groups, by picking channels on the Channels tab, or by a channel-name regex (e.g. `sport|espn`)
   - a channel can be in any number of categories
 - **Per-channel overrides**: rename, renumber, hide, set the guide id
 - **Two ways to watch**
-  1. **IPTV Hub channel** (Home → Channels → IPTV Hub): folders for your custom categories, then the playlist categories, then All Channels. Each channel shows what's on now and next.
+  1. **IPTV Hub channel** (Home → Channels → IPTV Hub): a folder per category in your order, then All Channels. Each channel shows what's on now and next.
   2. **Jellyfin Live TV** (optional, on by default): the plugin creates one M3U tuner per playlist and one XMLTV guide provider. You get the full guide grid, recordings and stream sharing. The tuner's channel group is the first custom category, otherwise the playlist group.
 - **Merged outputs** for other players: `/IptvHub/playlist.m3u` (optional `?category=<id or group name>`) and `/IptvHub/epg.xml`. Authenticate with `api_key`.
 - Scheduled task **"Refresh IPTV playlists and guides"** (Dashboard → Scheduled Tasks → Live TV), every 12 h by default.
@@ -58,8 +59,8 @@ Updates will then appear in the catalog.
 
 1. **Playlists** tab: click **+ URL** or **+ Server path**, or **Upload file…**. Then click **Save**.
 2. **Guides (EPG)** tab: add XMLTV sources the same way.
-3. **Categories** tab: add custom categories. Optionally give them name/group patterns.
-4. **Channels** tab: search and filter, tick channels, pick a category, then **Add to category**. You can also hide, rename or renumber channels here, or set a guide id.
+3. **Categories** tab: after the first save your playlist groups are already categories. Rename, reorder, merge or hide them as you like.
+4. **Channels** tab (optional): put individual channels into extra categories, or hide, rename or renumber channels, or set a guide id.
 5. **Save** applies your changes from cached downloads. **Save & re-download now** fetches every URL again.
 
 The status line at the top shows channel and guide counts, plus any errors (bad URL, missing file, invalid regex…).
@@ -77,8 +78,8 @@ The plugin keeps downloads in its data folder (`cache/`) and uses the last good 
 
 ## Releasing a new version
 
-1. `./build.ps1 -Version 1.0.1.0` (it prints the zip's MD5).
-2. Create a GitHub release `v1.0.1.0` and attach `dist/IptvHub_1.0.1.0.zip`.
+1. `./build.ps1 -Version 1.2.0.0 -Changelog "…"` (it prints the zip's MD5).
+2. Create a GitHub release `v1.2.0.0` and attach `dist/IptvHub_1.2.0.0.zip`.
 3. Add a new entry at the **top** of `versions` in `manifest.json`: the version, the release download URL, the MD5 checksum and a UTC timestamp. Then push it.
 
 ## Development
