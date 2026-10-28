@@ -17,9 +17,12 @@ public sealed class IptvStartupService : IHostedService, IDisposable
     private readonly CancellationTokenSource _stopping = new();
     private CancellationTokenSource? _debounce;
 
-    public IptvStartupService(IptvManager manager, ILogger<IptvStartupService> logger)
+    private readonly LiveTvTagger _tagger;
+
+    public IptvStartupService(IptvManager manager, LiveTvTagger tagger, ILogger<IptvStartupService> logger)
     {
         _manager = manager;
+        _tagger = tagger;
         _logger = logger;
     }
 
@@ -33,6 +36,7 @@ public sealed class IptvStartupService : IHostedService, IDisposable
         }
 
         Plugin.Instance.ConfigurationChanged += OnConfigurationChanged;
+        _tagger.Start();
 
         // Give Live TV a moment to finish starting, then load from cache (downloads only if stale).
         Schedule(TimeSpan.FromSeconds(15), force: false);

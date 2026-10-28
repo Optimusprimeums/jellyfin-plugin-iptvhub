@@ -18,6 +18,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<SourceFetcher>();
         serviceCollection.AddSingleton<LiveTvPublisher>();
         serviceCollection.AddSingleton<IptvManager>();
+        serviceCollection.AddSingleton<LiveTvTagger>();
         serviceCollection.AddSingleton<IChannel, IptvHubChannel>();
         serviceCollection.AddHostedService<IptvStartupService>();
     }

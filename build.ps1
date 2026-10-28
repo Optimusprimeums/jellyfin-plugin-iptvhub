@@ -1,5 +1,5 @@
 # Builds the plugin and produces an installable zip in ./dist
-param([string]$Version = "1.1.0.0", [string]$Changelog = "")
+param([string]$Version = "1.2.0.0", [string]$Changelog = "")
 $ErrorActionPreference = "Stop"
 $root = $PSScriptRoot
 $out = Join-Path $root "dist\IptvHub_$Version"

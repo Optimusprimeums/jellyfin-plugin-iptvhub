@@ -137,6 +137,24 @@ public class PipelineTests
         var media = await channel.GetChannelItemMediaInfo(favItems.Items[0].Id, CancellationToken.None);
         Assert.True(media.Single().IsInfiniteStream);
 
+        // Every generated channel carries a unique channel-id so Jellyfin keeps variants apart and we can map back.
+        Assert.Contains("channel-id=\"ih" + byName["News One HD"].Key + "\"", localM3u);
+
+        // Live TV channels Jellyfin created from our playlists get their categories as tags; others are untouched.
+        var library = new Mock<MediaBrowser.Controller.Library.ILibraryManager>();
+        MediaBrowser.Controller.Entities.BaseItem.LibraryManager = library.Object;
+        var newsTv = new MediaBrowser.Controller.LiveTv.LiveTvChannel { ExternalId = "ih" + byName["News One HD"].Key + "_news1", Tags = Array.Empty<string>() };
+        var kidsTv = new MediaBrowser.Controller.LiveTv.LiveTvChannel { ExternalId = "ih" + byName["Kids TV"].Key + "_kids.tv", Tags = new[] { "old" } };
+        var foreign = new MediaBrowser.Controller.LiveTv.LiveTvChannel { ExternalId = "hdhr_5.1", Tags = new[] { "mine" } };
+        library.Setup(l => l.GetItemList(It.IsAny<MediaBrowser.Controller.Entities.InternalItemsQuery>()))
+            .Returns(new List<MediaBrowser.Controller.Entities.BaseItem> { newsTv, kidsTv, foreign });
+        var tagger = new LiveTvTagger(manager, library.Object, tasks.Object, NullLogger<LiveTvTagger>.Instance);
+        Assert.Equal(2, await tagger.TagChannelsAsync(CancellationToken.None));
+        Assert.Equal(new[] { "Favourites", "News" }, newsTv.Tags);
+        Assert.Equal(new[] { "Favourites", "Kids" }, kidsTv.Tags);
+        Assert.Equal(new[] { "mine" }, foreign.Tags);
+        Assert.Equal(0, await tagger.TagChannelsAsync(CancellationToken.None));
+
         // Hiding a category removes its folder; "hide channels" hides everything in it.
         cfg.Categories.Single(c => c.Name == "Uncategorized").Hidden = true;
         cfg.Categories.Single(c => c.Name == "Kids").HideChannels = true;

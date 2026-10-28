@@ -27,7 +27,7 @@ Built for **Jellyfin 12.4** (.NET 10).
 - **Per-channel overrides**: rename, renumber, hide, set the guide id
 - **Two ways to watch**
   1. **IPTV Hub channel** (Home → Channels → IPTV Hub): a folder per category in your order, then All Channels. Each channel shows what's on now and next.
-  2. **Jellyfin Live TV** (optional, on by default): the plugin creates one M3U tuner per playlist and one XMLTV guide provider. You get the full guide grid, recordings and stream sharing. The tuner's channel group is the first custom category, otherwise the playlist group.
+  2. **Jellyfin Live TV** (optional, on by default): the plugin creates one M3U tuner per playlist and one XMLTV guide provider. You get the full guide grid, recordings and stream sharing. Jellyfin's Live TV page is always a flat list. To find channels by category, each Live TV channel is **tagged with its categories**: click a tag on a channel's page to list every channel with that tag. The `/Items?includeItemTypes=TvChannel&tags=Sports` API filter also works.
 - **Merged outputs** for other players: `/IptvHub/playlist.m3u` (optional `?category=<id or group name>`) and `/IptvHub/epg.xml`. Authenticate with `api_key`.
 - Scheduled task **"Refresh IPTV playlists and guides"** (Dashboard → Scheduled Tasks → Live TV), every 12 h by default.
 
