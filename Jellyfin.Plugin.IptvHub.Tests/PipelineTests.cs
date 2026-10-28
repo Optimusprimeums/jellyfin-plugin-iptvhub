@@ -137,15 +137,12 @@ public class PipelineTests
         var media = await channel.GetChannelItemMediaInfo(favItems.Items[0].Id, CancellationToken.None);
         Assert.True(media.Single().IsInfiniteStream);
 
-        // Every generated channel carries a unique channel-id so Jellyfin keeps variants apart and we can map back.
-        Assert.Contains("channel-id=\"ih" + byName["News One HD"].Key + "\"", localM3u);
-
         // Live TV channels Jellyfin created from our playlists get their categories as tags; others are untouched.
         var library = new Mock<MediaBrowser.Controller.Library.ILibraryManager>();
         MediaBrowser.Controller.Entities.BaseItem.LibraryManager = library.Object;
-        var newsTv = new MediaBrowser.Controller.LiveTv.LiveTvChannel { ExternalId = "ih" + byName["News One HD"].Key + "_news1", Tags = Array.Empty<string>() };
-        var kidsTv = new MediaBrowser.Controller.LiveTv.LiveTvChannel { ExternalId = "ih" + byName["Kids TV"].Key + "_kids.tv", Tags = new[] { "old" } };
-        var foreign = new MediaBrowser.Controller.LiveTv.LiveTvChannel { ExternalId = "hdhr_5.1", Tags = new[] { "mine" } };
+        var newsTv = new MediaBrowser.Controller.LiveTv.LiveTvChannel { ExternalId = JellyfinId(byName["News One HD"]), Tags = Array.Empty<string>() };
+        var kidsTv = new MediaBrowser.Controller.LiveTv.LiveTvChannel { ExternalId = JellyfinId(byName["Kids TV"]), Tags = new[] { "old" } };
+        var foreign = new MediaBrowser.Controller.LiveTv.LiveTvChannel { ExternalId = "m3u_" + new string('0', 64), Tags = new[] { "mine" } };
         library.Setup(l => l.GetItemList(It.IsAny<MediaBrowser.Controller.Entities.InternalItemsQuery>()))
             .Returns(new List<MediaBrowser.Controller.Entities.BaseItem> { newsTv, kidsTv, foreign });
         var tagger = new LiveTvTagger(manager, library.Object, tasks.Object, NullLogger<LiveTvTagger>.Instance);
@@ -170,5 +167,13 @@ public class PipelineTests
         listings.Verify(l => l.DeleteListingsProvider("lp1"), Times.Once);
 
         Directory.Delete(root, true);
+    }
+
+    // Independent re-implementation of Jellyfin 12.4's M3U channel id: "m3u_" + MD5(tuner url) + MD5(stream url),
+    // each MD5 taken over UTF-16LE bytes and formatted as a Guid ("N").
+    private static string JellyfinId(Models.IptvChannel c)
+    {
+        static string Md5(string s) => new Guid(System.Security.Cryptography.MD5.HashData(System.Text.Encoding.Unicode.GetBytes(s))).ToString("N");
+        return "m3u_" + Md5(IptvManager.PlaylistPath(c.SourceId)) + Md5(c.Url);
     }
 }

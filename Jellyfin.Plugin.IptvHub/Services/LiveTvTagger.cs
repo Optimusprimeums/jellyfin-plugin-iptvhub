@@ -1,8 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data.Enums;
+using Jellyfin.Plugin.IptvHub.Models;
+using MediaBrowser.Common.Extensions;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.LiveTv;
@@ -68,14 +72,25 @@ public sealed class LiveTvTagger : IDisposable
                 Recursive = true
             });
 
-            var updated = 0;
-            foreach (var channel in items.OfType<LiveTvChannel>())
+            // Index our visible channels by the id Jellyfin's M3U tuner gives them; the first one wins for
+            // duplicate stream URLs, just as Jellyfin keeps only one channel for them.
+            var byExternalId = new Dictionary<string, IptvChannel>(StringComparer.OrdinalIgnoreCase);
+            foreach (var c in snapshot.Channels.Where(c => !c.Hidden))
             {
-                var key = KeyFromExternalId(channel.ExternalId);
-                if (key is null || !snapshot.ByKey.TryGetValue(key, out var ours))
+                byExternalId.TryAdd(ExternalIdFor(IptvManager.PlaylistPath(c.SourceId), c.Url), c);
+            }
+
+            var updated = 0;
+            var matched = 0;
+            var liveTvChannels = items.OfType<LiveTvChannel>().ToList();
+            foreach (var channel in liveTvChannels)
+            {
+                if (string.IsNullOrEmpty(channel.ExternalId) || !byExternalId.TryGetValue(channel.ExternalId, out var ours))
                 {
                     continue;
                 }
+
+                matched++;
 
                 var tags = IptvManager.CategoryNamesFor(ours, snapshot.VisibleCategoryNames);
                 if (tags.Length == 0)
@@ -93,10 +108,11 @@ public sealed class LiveTvTagger : IDisposable
                 updated++;
             }
 
-            if (updated > 0)
-            {
-                _logger.LogInformation("IPTV Hub: tagged {Count} Live TV channels with their categories", updated);
-            }
+            _logger.LogInformation(
+                "IPTV Hub: {Matched} of {Total} Live TV channels are from IPTV Hub; updated category tags on {Updated}",
+                matched,
+                liveTvChannels.Count,
+                updated);
 
             return updated;
         }
@@ -107,21 +123,16 @@ public sealed class LiveTvTagger : IDisposable
     }
 
     /// <summary>
-    /// Extracts the plugin's channel key from a Live TV channel's external id ("ih{key}" or "ih{key}_{tvg-id}").
+    /// The external id Jellyfin's M3U tuner assigns to a channel: "m3u_" + MD5(tuner playlist path) + MD5(stream URL),
+    /// using Jellyfin's own hashing so the two always agree.
     /// </summary>
-    /// <param name="externalId">External id.</param>
-    /// <returns>The key, or null if the channel did not come from this plugin.</returns>
-    public static string? KeyFromExternalId(string? externalId)
-    {
-        if (string.IsNullOrEmpty(externalId) || !externalId.StartsWith(IptvManager.LiveTvChannelIdPrefix, StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        var rest = externalId[IptvManager.LiveTvChannelIdPrefix.Length..];
-        var underscore = rest.IndexOf('_', StringComparison.Ordinal);
-        return underscore >= 0 ? rest[..underscore] : rest;
-    }
+    /// <param name="tunerUrl">The tuner's playlist path or URL.</param>
+    /// <param name="streamUrl">The channel's stream URL.</param>
+    /// <returns>The external id.</returns>
+    public static string ExternalIdFor(string tunerUrl, string streamUrl)
+        => "m3u_"
+            + tunerUrl.GetMD5().ToString("N", CultureInfo.InvariantCulture)
+            + streamUrl.Trim().GetMD5().ToString("N", CultureInfo.InvariantCulture);
 
     private void OnRefreshed(object? sender, EventArgs e) => Run();
 

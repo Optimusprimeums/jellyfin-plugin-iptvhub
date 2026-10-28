@@ -43,16 +43,6 @@ public class ParserTests
         Assert.Equal("Foo", entries[2].Headers["User-Agent"]);
     }
 
-    [Theory]
-    [InlineData("ihabc123def456_bbc1.uk", "abc123def456")]
-    [InlineData("ihabc123def456-2", "abc123def456-2")]
-    [InlineData("ihabc123def456_some_id_with_underscores", "abc123def456")]
-    [InlineData("m3u_0123abcd", null)]
-    [InlineData("", null)]
-    [InlineData(null, null)]
-    public void MapsLiveTvChannelIdsBack(string? externalId, string? key)
-        => Assert.Equal(key, Services.LiveTvTagger.KeyFromExternalId(externalId));
-
     [Fact]
     public void PlaylistGroupsBecomeCategories()
     {

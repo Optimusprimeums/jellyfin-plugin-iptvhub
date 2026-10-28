@@ -86,10 +86,6 @@ public sealed partial class IptvManager : IDisposable
 {
     /// <summary>Name used for playlist groups without a group-title.</summary>
     public const string UngroupedName = "Uncategorized";
-
-    /// <summary>Prefix of the channel-id written to generated playlists (non-numeric so Jellyfin never uses it as a channel number).</summary>
-    public const string LiveTvChannelIdPrefix = "ih";
-
     private readonly SourceFetcher _fetcher;
     private readonly LiveTvPublisher _publisher;
     private readonly ILogger<IptvManager> _logger;
@@ -472,10 +468,6 @@ public sealed partial class IptvManager : IDisposable
             // Jellyfin keeps a single group per channel; a custom category takes precedence over the playlist's.
             var group = c.CategoryIds.Select(id => categoryNames.GetValueOrDefault(id)).FirstOrDefault(n => !string.IsNullOrEmpty(n)) ?? c.Group;
             sb.Append("#EXTINF:-1");
-
-            // Jellyfin builds its channel id from channel-id + tvg-id, so this keeps channels that share a guide id
-            // apart and lets the Live TV tagger map Jellyfin's channels back to ours.
-            Attr(sb, "channel-id", LiveTvChannelIdPrefix + c.Key);
             Attr(sb, "tvg-id", c.EpgId);
             Attr(sb, "tvg-name", c.Name);
             Attr(sb, "tvg-logo", c.Logo);
