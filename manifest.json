@@ -1,0 +1,21 @@
+[
+  {
+    "guid": "7c1f6a52-3e1b-4c8e-9a0d-5b2f4e8d9c31",
+    "name": "IPTV Hub",
+    "description": "Serve IPTV from M3U playlists (URL, server path or upload) with XMLTV guides, playlist categories and your own custom categories.",
+    "overview": "M3U + XMLTV IPTV with categories",
+    "owner": "Optimusprimeums",
+    "category": "Live TV",
+    "imageUrl": "",
+    "versions": [
+      {
+        "version": "1.0.0.0",
+        "changelog": "Initial release.",
+        "targetAbi": "12.4.0.0",
+        "sourceUrl": "https://github.com/Optimusprimeums/jellyfin-plugin-iptvhub/releases/download/v1.0.0.0/IptvHub_1.0.0.0.zip",
+        "checksum": "2bc9a3ffc709a6abca0f55e5d14cbad4",
+        "timestamp": "2026-10-28T04:26:57Z"
+      }
+    ]
+  }
+]

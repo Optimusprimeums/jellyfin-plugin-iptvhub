@@ -30,7 +30,17 @@ Built for **Jellyfin 12.4** (.NET 10).
 - **Merged outputs** for other players: `/IptvHub/playlist.m3u` (optional `?category=<id or group name>`) and `/IptvHub/epg.xml`. Authenticate with `api_key`.
 - Scheduled task **"Refresh IPTV playlists and guides"** (Dashboard → Scheduled Tasks → Live TV), every 12 h by default.
 
-## Install
+## Install from the Jellyfin dashboard
+
+1. Go to **Dashboard → Plugins → Repositories** (on older layouts: Plugins → Catalog → ⚙ Settings) and add a repository:
+   - Name: `IPTV Hub`
+   - URL: `https://raw.githubusercontent.com/Optimusprimeums/jellyfin-plugin-iptvhub/master/manifest.json`
+2. Open the **Catalog**, find **IPTV Hub** under *Live TV*, and click **Install**.
+3. Restart Jellyfin, then open **Dashboard → Plugins → IPTV Hub**.
+
+Updates will then appear in the catalog.
+
+## Install manually
 
 1. Build it (needs the .NET 10 SDK):
    ```powershell
@@ -64,6 +74,12 @@ XMLTV guides ──────────┘   parse, match EPG,  ├─► <d
 ```
 
 The plugin keeps downloads in its data folder (`cache/`) and uses the last good copy if a download fails. Live TV playback goes through Jellyfin's own M3U tuner, so transcoding, stream sharing and recording work as usual.
+
+## Releasing a new version
+
+1. `./build.ps1 -Version 1.0.1.0` (it prints the zip's MD5).
+2. Create a GitHub release `v1.0.1.0` and attach `dist/IptvHub_1.0.1.0.zip`.
+3. Add a new entry at the **top** of `versions` in `manifest.json`: the version, the release download URL, the MD5 checksum and a UTC timestamp. Then push it.
 
 ## Development
 

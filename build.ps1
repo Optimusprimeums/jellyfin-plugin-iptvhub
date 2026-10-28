@@ -33,3 +33,4 @@ Compress-Archive -Path "$out\*" -DestinationPath $zip
 Remove-Item "$root\dist\publish" -Recurse -Force
 Write-Host "Plugin folder: $out"
 Write-Host "Zip:           $zip"
+Write-Host "MD5 (for manifest.json checksum): $((Get-FileHash $zip -Algorithm MD5).Hash.ToLowerInvariant())"
