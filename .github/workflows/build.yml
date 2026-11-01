@@ -1,0 +1,64 @@
+name: Build
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore Jellyfin.Plugin.IptvHub.sln
+      - run: dotnet build Jellyfin.Plugin.IptvHub.sln -c Release --no-restore
+      - run: dotnet test Jellyfin.Plugin.IptvHub.sln -c Release --no-build
+      - name: Package plugin zip
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/v*') { $version = $env:GITHUB_REF_NAME.Substring(1) }
+          else { $version = ([xml](Get-Content Jellyfin.Plugin.IptvHub/Jellyfin.Plugin.IptvHub.csproj)).Project.PropertyGroup.AssemblyVersion | Where-Object { $_ } | Select-Object -First 1 }
+          $changelog = ''
+          $manifest = Get-Content manifest.json -Raw | ConvertFrom-Json
+          $entry = $manifest[0].versions | Where-Object { $_.version -eq $version } | Select-Object -First 1
+          if ($entry) { $changelog = $entry.changelog }
+          ./build.ps1 -Version $version -Changelog $changelog
+          $zip = "dist/IptvHub_$version.zip"
+          $md5 = (Get-FileHash $zip -Algorithm MD5).Hash.ToLowerInvariant()
+          "Plugin zip: $zip  MD5: $md5" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          "$md5  IptvHub_$version.zip" | Set-Content dist/MD5SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IptvHub-plugin
+          path: |
+            dist/IptvHub_*.zip
+            dist/MD5SUMS.txt
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: IptvHub-plugin
+          path: dist
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+          gh release upload "$GITHUB_REF_NAME" dist/* --clobber
