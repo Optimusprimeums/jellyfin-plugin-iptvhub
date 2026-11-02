@@ -128,7 +128,7 @@ public class IptvHubController : ControllerBase
     }
 
     /// <summary>
-    /// Merged playlist of all visible channels (for other IPTV players). Authenticate with ?api_key=.
+    /// Merged playlist of all visible channels (for other IPTV players). Authenticate with ?ApiKey=.
     /// </summary>
     /// <param name="category">Optional custom category id or playlist group name to filter by.</param>
     /// <returns>M3U.</returns>

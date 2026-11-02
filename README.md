@@ -4,6 +4,8 @@ A Jellyfin plugin that serves IPTV from M3U playlists and XMLTV program guides. 
 
 Built for **Jellyfin 12.4** (.NET 10).
 
+📖 **Documentation:** [optimusprimeums.github.io/jellyfin-plugin-iptvhub](https://optimusprimeums.github.io/jellyfin-plugin-iptvhub/), also in the [wiki](https://github.com/Optimusprimeums/jellyfin-plugin-iptvhub/wiki).
+
 ## Features
 
 - **Playlists (M3U / M3U8)** from:
@@ -28,7 +30,7 @@ Built for **Jellyfin 12.4** (.NET 10).
 - **Two ways to watch**
   1. **IPTV Hub channel** (Home → Channels → IPTV Hub): a folder per category in your order, then All Channels. Each channel shows what's on now and next.
   2. **Jellyfin Live TV** (optional, on by default): the plugin creates one M3U tuner per playlist and one XMLTV guide provider. You get the full guide grid, recordings and stream sharing. Jellyfin's Live TV page is always a flat list. To find channels by category, each Live TV channel is **tagged with its categories**: click a tag on a channel's page to list every channel with that tag. The `/Items?includeItemTypes=TvChannel&tags=Sports` API filter also works.
-- **Merged outputs** for other players: `/IptvHub/playlist.m3u` (optional `?category=<id or group name>`) and `/IptvHub/epg.xml`. Authenticate with `api_key`.
+- **Merged outputs** for other players: `/IptvHub/playlist.m3u` (optional `?category=<id or group name>`) and `/IptvHub/epg.xml`. Authenticate with `?ApiKey=<key>` (an API key from Dashboard → API Keys).
 - Scheduled task **"Refresh IPTV playlists and guides"** (Dashboard → Scheduled Tasks → Live TV), every 12 h by default.
 
 ## Install from the Jellyfin dashboard
