@@ -26,12 +26,14 @@ Each row on the **Categories** tab has:
 | ▲ / ▼ | Move the category up or down. This is the folder order. |
 | **Name** | Rename the category. |
 | **Playlist groups** | The groups whose channels belong to it. Click **×** to remove a group, or use **+ group…** to add one. |
-| **Name pattern** | Optional regular expression, case-insensitive. Channels whose name matches are added, e.g. `sport\|espn\|dazn`. |
+| **Name pattern** | Optional regular expression, case-insensitive. Channels whose name matches are added (see the example below). |
 | **Channels** | How many visible channels it has, plus how many you picked by hand. |
 | **Show** | Untick to hide the category folder. Its channels stay visible in *All Channels* and any other categories. |
 | **Hide channels** | Hide every channel in this category, everywhere. Handy for groups you never watch. |
 | **Merge into…** | Move this category's groups, picked channels and name pattern into another category, then remove this one. |
 | **Delete** | Remove the category. Its channels stay in *All Channels*. |
+
+For example, the name pattern `sport|espn|dazn` adds every channel with "sport", "espn" or "dazn" anywhere in its name.
 
 Click **+ Category** to make an empty category of your own. Then fill it with groups, a name pattern, or channels picked on the [Channels](channels.md) tab.
 

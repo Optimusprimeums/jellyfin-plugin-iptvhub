@@ -48,7 +48,9 @@ If a download fails, the last good copy is used, and the error appears in the st
 | `tvg-chno`, `channel-number`, `tvg-num` | Channel number |
 | `x-tvg-url` / `url-tvg` in the `#EXTM3U` header | Extra guide sources (see [Guides](guides.md)) |
 | `#EXTVLCOPT:http-user-agent=…`, `#EXTVLCOPT:http-referrer=…` | Per-channel request headers |
-| `url\|User-Agent=…&Referer=…` (Kodi style) | Per-channel request headers |
+| Kodi-style headers after the stream URL (see below) | Per-channel request headers |
+
+Kodi-style headers follow a `|` at the end of the stream URL, for example `http://host/stream.ts|User-Agent=VLC&Referer=http%3A%2F%2Fsite`.
 
 Gzipped playlists are detected and unpacked automatically.
 
