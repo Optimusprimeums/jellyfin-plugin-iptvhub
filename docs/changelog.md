@@ -6,6 +6,10 @@ wiki_title: Changelog
 
 # Changelog
 
+## 1.2.2.0
+
+- **Fixed:** the plugin's Settings tab now tells you to add `?ApiKey=…` to the playlist and guide export links. Jellyfin 12.4 accepts that by default; the old `?api_key=…` only works with legacy authorization turned on.
+
 ## 1.2.1.0
 
 - **Fixed:** Live TV channels are now actually tagged with their categories; 1.2.0.0 matched no channels. The log reports how many were matched after every run.
