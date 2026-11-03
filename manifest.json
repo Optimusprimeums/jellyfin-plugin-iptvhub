@@ -9,6 +9,14 @@
     "imageUrl": "",
     "versions": [
       {
+        "version": "1.2.2.0",
+        "changelog": "Fix: the plugin page now shows the right API key parameter (?ApiKey=…) for the playlist and guide export links.",
+        "targetAbi": "12.4.0.0",
+        "sourceUrl": "https://github.com/Optimusprimeums/jellyfin-plugin-iptvhub/releases/download/v1.2.2.0/IptvHub_1.2.2.0.zip",
+        "checksum": "4342e453812bd640db82ee7e2be581ce",
+        "timestamp": "2026-11-03T01:27:01Z"
+      },
+      {
         "version": "1.2.1.0",
         "changelog": "Fix: Live TV channels are now actually tagged with their categories (1.2.0.0 matched no channels). Correction: 1.2.0.0 did not merge channels or rebuild Live TV channels; favourites and recordings were never affected.",
         "targetAbi": "12.4.0.0",
