@@ -80,9 +80,11 @@ The plugin keeps downloads in its data folder (`cache/`) and uses the last good 
 
 ## Releasing a new version
 
-1. `./build.ps1 -Version 1.2.0.0 -Changelog "…"` (it prints the zip's MD5).
-2. Create a GitHub release `v1.2.0.0` and attach `dist/IptvHub_1.2.0.0.zip`.
-3. Add a new entry at the **top** of `versions` in `manifest.json`: the version, the release download URL, the MD5 checksum and a UTC timestamp. Then push it.
+1. Bump the version in `Jellyfin.Plugin.IptvHub.csproj` and push.
+2. Create a GitHub release tagged `v<version>`. Optionally attach your own zip from `./build.ps1`.
+3. CI attaches a zip if there isn't one, never replaces one that's there, and updates `manifest.json` from the published zip. Don't edit release entries in the manifest by hand.
+
+See [Development](https://optimusprimeums.github.io/jellyfin-plugin-iptvhub/development.html) for details.
 
 ## Development
 

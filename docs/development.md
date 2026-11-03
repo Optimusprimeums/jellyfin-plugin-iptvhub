@@ -45,17 +45,27 @@ The end-to-end test runs the whole refresh against fake Jellyfin services: playl
 | `Api/IptvHubController` | Endpoints for the config page, plus the [exports](exports.md). |
 | `Configuration/configPage.html` | The plugin's dashboard page. |
 
+## Continuous integration
+
+`.github/workflows/build.yml` builds and tests every push and pull request, and attaches the plugin zip as a workflow artifact.
+
 ## Releasing
 
-1. Bump `AssemblyVersion` / `FileVersion` in the `.csproj`, then run `./build.ps1 -Version x.y.z.w -Changelog "…"`.
-2. Create a GitHub release `vx.y.z.w` and attach the zip.
-3. Add an entry at the **top** of `versions` in `manifest.json`, with:
-   - the version;
-   - the release download URL;
-   - the MD5 checksum;
-   - a UTC timestamp;
-   - `targetAbi` `12.4.0.0`.
-4. Push. Servers with the repository added see the update in their catalog.
+Releases are driven by `v*` tags, and **CI keeps `manifest.json` in step with the release**. Jellyfin rejects a download whose MD5 doesn't match the manifest, so don't edit release entries in the manifest by hand.
+
+1. Bump `AssemblyVersion` / `FileVersion` in the `.csproj` and push to `master`.
+2. Create a GitHub release with the tag `vx.y.z.w`, using its notes for the changes. Either:
+   - leave it without files, and CI builds the zip and attaches it; or
+   - attach your own `IptvHub_x.y.z.w.zip` (from `./build.ps1`). CI **never replaces** a zip that's already attached.
+3. CI then downloads the zip as published, and adds or corrects the version's entry in `manifest.json`:
+   - MD5 checksum, download URL and timestamp come from that published zip;
+   - the changelog is the first line of the release notes;
+   - `targetAbi` is `12.4.0.0`.
+
+   CI commits the result to `master` and uploads an `MD5SUMS.txt` beside the zip.
+4. Servers with the repository added see the update in their catalog.
+
+To re-check an existing release, run **Actions → Build → Run workflow** with its tag (e.g. `v1.2.1.0`). This keeps the release's zip and only fixes `manifest.json` if its entry doesn't match.
 
 ## Docs
 

@@ -5,6 +5,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Re-check an existing release (e.g. v1.2.1.0): keep its zip, fix manifest.json if it doesn't match"
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -43,22 +48,82 @@ jobs:
             dist/MD5SUMS.txt
           if-no-files-found: error
 
+  # Jellyfin checks the downloaded zip against manifest.json's MD5, so the zip on the release and the
+  # manifest must always agree. This job never replaces a zip that is already attached (e.g. one
+  # uploaded by hand), and always writes the manifest entry from the zip that is actually published.
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.tag != '')
     needs: build
     runs-on: ubuntu-latest
+    concurrency:
+      group: release-manifest
+      cancel-in-progress: false
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
       - uses: actions/download-artifact@v4
         with:
           name: IptvHub-plugin
           path: dist
-      - name: Publish GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
+      - name: Publish release asset (never replace an existing zip)
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
-          gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          set -euo pipefail
+          version="${TAG#v}"
+          asset="IptvHub_${version}.zip"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "ASSET=$asset" >> "$GITHUB_ENV"
+
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "IPTV Hub $version" --generate-notes --verify-tag
+          fi
+
+          if gh release view "$TAG" --json assets -q '.assets[].name' | grep -qxF "$asset"; then
+            echo "Keeping the $asset already attached to $TAG" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            if [ ! -f "dist/$asset" ]; then
+              echo "::error::$TAG has no $asset and this build did not produce one (version mismatch?)"
+              exit 1
+            fi
+            gh release upload "$TAG" "dist/$asset"
+            echo "Uploaded CI-built $asset to $TAG" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+          # Everything below uses the zip as published, not the one built here.
+          mkdir -p published
+          gh release download "$TAG" --pattern "$asset" --dir published --clobber
+          md5="$(md5sum "published/$asset" | cut -d' ' -f1)"
+          echo "$md5  $asset" > published/MD5SUMS.txt
+          gh release upload "$TAG" published/MD5SUMS.txt --clobber
+          echo "Published $asset MD5: $md5" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Update manifest.json from the published zip
+        run: |
+          set -euo pipefail
+          published_at="$(gh release view "$TAG" --json publishedAt -q .publishedAt)"
+          notes="$(gh release view "$TAG" --json body -q .body | sed -e 's/[*`]//g' -e '/^\s*$/d' | head -n 1 | cut -c1-300)"
+          changelog_args=()
+          if ! python3 -c "import json,sys; v=json.load(open('manifest.json'))[0]['versions']; sys.exit(0 if any(x['version']=='$VERSION' for x in v) else 1)"; then
+            changelog_args=(--changelog "${notes:-See the release notes for $TAG.}")
+          fi
+          result="$(python3 scripts/update_manifest.py \
+            --version "$VERSION" \
+            --zip "published/$ASSET" \
+            --url "https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG/$ASSET" \
+            --timestamp "$published_at" \
+            "${changelog_args[@]}")"
+          echo "manifest.json: $result" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$result" = "changed" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add manifest.json
+            git commit -m "Update manifest for $TAG"
+            git pull --rebase origin master
+            git push origin HEAD:master
+          fi
