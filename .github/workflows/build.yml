@@ -28,13 +28,27 @@ jobs:
       - run: dotnet test Jellyfin.Plugin.IptvHub.sln -c Release --no-build
       - name: Package plugin zip
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           if ($env:GITHUB_REF -like 'refs/tags/v*') { $version = $env:GITHUB_REF_NAME.Substring(1) }
           else { $version = ([xml](Get-Content Jellyfin.Plugin.IptvHub/Jellyfin.Plugin.IptvHub.csproj)).Project.PropertyGroup.AssemblyVersion | Where-Object { $_ } | Select-Object -First 1 }
+          # Same rule as the release job uses for manifest.json: an existing manifest entry wins,
+          # otherwise the first line of the release notes.
           $changelog = ''
           $manifest = Get-Content manifest.json -Raw | ConvertFrom-Json
           $entry = $manifest[0].versions | Where-Object { $_.version -eq $version } | Select-Object -First 1
           if ($entry) { $changelog = $entry.changelog }
+          elseif ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $body = gh release view $env:GITHUB_REF_NAME --json body -q .body 2>$null
+            if ($LASTEXITCODE -eq 0 -and $body) {
+              $first = ($body -split "`n" | ForEach-Object { ($_ -replace '[*`]', '').Trim() } | Where-Object { $_ } | Select-Object -First 1)
+              if ($first) { $changelog = $first.Substring(0, [Math]::Min(300, $first.Length)) }
+            }
+            $global:LASTEXITCODE = 0
+          }
+          "Changelog: $changelog" | Tee-Object -FilePath $env:GITHUB_STEP_SUMMARY -Append
           ./build.ps1 -Version $version -Changelog $changelog
           $zip = "dist/IptvHub_$version.zip"
           $md5 = (Get-FileHash $zip -Algorithm MD5).Hash.ToLowerInvariant()
@@ -107,7 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           published_at="$(gh release view "$TAG" --json publishedAt -q .publishedAt)"
-          notes="$(gh release view "$TAG" --json body -q .body | sed -e 's/[*`]//g' -e '/^\s*$/d' | head -n 1 | cut -c1-300)"
+          notes="$(gh release view "$TAG" --json body -q .body | sed -e 's/[*`]//g' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' | head -n 1 | cut -c1-300)"
           changelog_args=()
           if ! python3 -c "import json,sys; v=json.load(open('manifest.json'))[0]['versions']; sys.exit(0 if any(x['version']=='$VERSION' for x in v) else 1)"; then
             changelog_args=(--changelog "${notes:-See the release notes for $TAG.}")
